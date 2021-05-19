@@ -1,0 +1,2217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 19-May-2021 at 12:19:08 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.10.0", "pytest": "6.2.4"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>macOS-11.2.2-arm64-arm-64bit</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "3.1.1", "metadata": "1.11.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.9.2</td></tr></table>
+    <h2>Summary</h2>
+    <p>216 tests ran in 146.60 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">201 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">15 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[12345-400]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;12345&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/12345&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[-12345-400]</td>
+          <td class="col-duration">0.82</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-12345&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/-12345&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[50000-400]</td>
+          <td class="col-duration">0.76</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;50000&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/50000&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[-50000-400]</td>
+          <td class="col-duration">0.75</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-50000&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/-50000&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[100000-400]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;100000&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/100000&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[-100000-400]</td>
+          <td class="col-duration">0.71</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-100000&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/-100000&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[+200-400]</td>
+          <td class="col-duration">0.68</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;+200&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 200 == 400</span><br/><span class="error">E        +  where 200 = &lt;Response [200]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [200]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/en/+200&#x27;)</span><br/><br/>test_en.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-10000-{&quot;full&quot;: &quot;minus ten thousand&quot;}]</td>
+          <td class="col-duration">0.61</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-10000&#x27;, expected_return = b&#x27;{&quot;full&quot;: &quot;minus ten thousand&quot;}&#x27;<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], data[&quot;expected_content_en&quot;])<br/>    <br/>            for data in data_mock<br/>            if data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).content == expected_return<br/><span class="error">E       assert b&#x27;minus ten thousand&#x27; == b&#x27;{&quot;full&quot;: &quot;m...en thousand&quot;}&#x27;</span><br/><span class="error">E         At index 0 diff: b&#x27;m&#x27; != b&#x27;{&#x27;</span><br/><span class="error">E         Use -v to get the full diff</span><br/><br/>test_en.py:100: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[+200-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;+200&#x27;, expected_return = b&#x27;{&quot;full&quot;: &quot;Invalid data&quot;}&#x27;<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], data[&quot;expected_content_en&quot;])<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).content == expected_return<br/><span class="error">E       assert b&#x27;{&quot;full&quot;: &quot;two hundred&quot;}&#x27; == b&#x27;{&quot;full&quot;: &quot;Invalid data&quot;}&#x27;</span><br/><span class="error">E         At index 10 diff: b&#x27;t&#x27; != b&#x27;I&#x27;</span><br/><span class="error">E         Use -v to get the full diff</span><br/><br/>test_en.py:114: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[XPTO-400]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;XPTO&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/XPTO&#x27;)</span><br/><br/>test_pt.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[-XPTO-400]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-XPTO&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/-XPTO&#x27;)</span><br/><br/>test_pt.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[+200-400]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;+200&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 200 == 400</span><br/><span class="error">E        +  where 200 = &lt;Response [200]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [200]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/+200&#x27;)</span><br/><br/>test_pt.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[-2a-400]</td>
+          <td class="col-duration">0.61</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;-2a&#x27;, expected_return = 400<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], 400)<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_with_invalid_argument_should_return_400_bad_request(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).status_code == expected_return<br/><span class="error">E       AssertionError: assert 401 == 400</span><br/><span class="error">E        +  where 401 = &lt;Response [401]&gt;.status_code</span><br/><span class="error">E        +    where &lt;Response [401]&gt; = get(&#x27;http://challengeqa.staging.devmuch.io/-2a&#x27;)</span><br/><br/>test_pt.py:86: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[10000-{&quot;extenso&quot;: &quot;dez mil&quot;}]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;10000&#x27;, expected_return = b&#x27;{&quot;extenso&quot;: &quot;dez mil&quot;}&#x27;<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], data[&quot;expected_content_pt&quot;])<br/>    <br/>            for data in data_mock<br/>            if data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).content == expected_return<br/><span class="error">E       assert b&#x27;{&quot;extenso&quot;: &quot;ten thousand&quot;}&#x27; == b&#x27;{&quot;extenso&quot;: &quot;dez mil&quot;}&#x27;</span><br/><span class="error">E         At index 13 diff: b&#x27;t&#x27; != b&#x27;d&#x27;</span><br/><span class="error">E         Use -v to get the full diff</span><br/><br/>test_pt.py:100: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[+200-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">test_input = &#x27;+200&#x27;, expected_return = b&#x27;{&quot;extenso&quot;: &quot;Invalid data&quot;}&#x27;<br/><br/>    @pytest.mark.parametrize(<br/>        &quot;test_input, expected_return&quot;,<br/>        [<br/>            (data[&quot;argument&quot;], data[&quot;expected_content_pt&quot;])<br/>    <br/>            for data in data_mock<br/>            if not data[&quot;is_valid&quot;]<br/>        ]<br/>    )<br/>    def test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content(test_input, expected_return):<br/>        full_url = domain_url + test_input<br/>&gt;       assert get(full_url).content == expected_return<br/><span class="error">E       assert b&#x27;{&quot;extenso&quot;: &quot;duzentos&quot;}&#x27; == b&#x27;{&quot;extenso&quot;: &quot;Invalid data&quot;}&#x27;</span><br/><span class="error">E         At index 13 diff: b&#x27;d&#x27; != b&#x27;I&#x27;</span><br/><span class="error">E         Use -v to get the full diff</span><br/><br/>test_pt.py:114: AssertionError<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[1000-200]</td>
+          <td class="col-duration">1.30</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[-1000-200]</td>
+          <td class="col-duration">0.79</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[10000-200]</td>
+          <td class="col-duration">0.65</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[-10000-200]</td>
+          <td class="col-duration">1.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[1-200]</td>
+          <td class="col-duration">0.65</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[-1-200]</td>
+          <td class="col-duration">0.86</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[1234-200]</td>
+          <td class="col-duration">0.75</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_content_argument_should_return_200_satus_code[-1234-200]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.76</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">1.94</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">1.08</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.55</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">1.55</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.58</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.64</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.55</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_post_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.62</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.80</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">1.30</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">0.76</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">0.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.69</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">1.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.56</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.99</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.97</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_put_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">1.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.79</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.43</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">0.87</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">1.88</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">1.78</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.77</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.58</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">0.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.66</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.82</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">1.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[XPTO-400]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[-XPTO-400]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_with_invalid_argument_should_return_400_bad_request[-2a-400]</td>
+          <td class="col-duration">0.82</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1000-{&quot;full&quot;: &quot;one thousand&quot;}]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1000-{&quot;full&quot;: &quot;minus one thousand&quot;}]</td>
+          <td class="col-duration">0.54</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[10000-{&quot;full&quot;: &quot;ten thousand&quot;}]</td>
+          <td class="col-duration">0.58</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1-{&quot;full&quot;: &quot;one&quot;}]</td>
+          <td class="col-duration">0.75</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1-{&quot;full&quot;: &quot;minus one&quot;}]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1234-{&quot;full&quot;: &quot;one thousand, two hundred and thirty-four&quot;}]</td>
+          <td class="col-duration">0.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1234-{&quot;full&quot;: &quot;minus one thousand, two hundred and thirty-four&quot;}]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[12345-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">2.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-12345-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[50000-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.98</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-50000-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[100000-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-100000-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[XPTO-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-XPTO-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_en.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-2a-{&quot;full&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.43</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[1000-200]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[-1000-200]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[10000-200]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[-10000-200]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[1-200]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[-1-200]</td>
+          <td class="col-duration">0.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[1234-200]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_content_argument_should_return_200_satus_code[-1234-200]</td>
+          <td class="col-duration">0.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.64</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.77</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">1.04</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">1.06</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">1.07</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.85</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.51</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.59</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.67</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_post_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.71</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.82</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.60</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">2.41</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">1.53</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.64</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.80</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_put_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.85</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.66</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">0.76</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">0.79</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">1.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.69</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_patch_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1000-405]</td>
+          <td class="col-duration">0.43</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1000-405]</td>
+          <td class="col-duration">1.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[10000-405]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-10000-405]</td>
+          <td class="col-duration">0.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1-405]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1-405]</td>
+          <td class="col-duration">1.69</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[1234-405]</td>
+          <td class="col-duration">1.09</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-1234-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[12345-405]</td>
+          <td class="col-duration">1.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-12345-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[50000-405]</td>
+          <td class="col-duration">1.03</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-50000-405]</td>
+          <td class="col-duration">1.29</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[100000-405]</td>
+          <td class="col-duration">0.54</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-100000-405]</td>
+          <td class="col-duration">0.51</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[XPTO-405]</td>
+          <td class="col-duration">0.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-XPTO-405]</td>
+          <td class="col-duration">0.46</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[+200-405]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_delete_with_any_argument_should_return_405_not_allowed[-2a-405]</td>
+          <td class="col-duration">0.80</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[12345-400]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[-12345-400]</td>
+          <td class="col-duration">0.63</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[50000-400]</td>
+          <td class="col-duration">0.68</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[-50000-400]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[100000-400]</td>
+          <td class="col-duration">0.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_with_invalid_argument_should_return_400_bad_request[-100000-400]</td>
+          <td class="col-duration">0.75</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1000-{&quot;extenso&quot;: &quot;mil&quot;}]</td>
+          <td class="col-duration">0.55</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1000-{&quot;extenso&quot;: &quot;menos mil&quot;}]</td>
+          <td class="col-duration">1.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-10000-{&quot;extenso&quot;: &quot;menos dez mil&quot;}]</td>
+          <td class="col-duration">0.65</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1-{&quot;extenso&quot;: &quot;um&quot;}]</td>
+          <td class="col-duration">0.99</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1-{&quot;extenso&quot;: &quot;menos um&quot;}]</td>
+          <td class="col-duration">0.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[1234-{&quot;extenso&quot;: &quot;mil duzentos e trinta e quatro&quot;}]</td>
+          <td class="col-duration">0.81</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_when_argument_is_valid_should_return_expected_json_content[-1234-{&quot;extenso&quot;: &quot;menos mil duzentos e trinta e quatro&quot;}]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[12345-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-12345-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.83</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[50000-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-50000-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[100000-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.97</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-100000-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[XPTO-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-XPTO-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.96</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test_pt.py::test_request_in_portuguese_with_invalid_argument_should_return_expected_json_content[-2a-{&quot;extenso&quot;: &quot;Invalid data&quot;}]</td>
+          <td class="col-duration">0.48</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody></table></body></html>
