@@ -5,7 +5,7 @@
 * Baixe o repositório na sua máquina local
 * Tenha a certeza de que você possui, em sua máquina, a versão 3.9 do python e a lib pipenv
     * Caso sua versão do python seja diferente, altere a variável "python_version" no arquivo Pipfile, substituindo o 3.9 pela sua versão (a versão deve ser 3.6 ou superior)
-    * Caso não possua o pipenv, instale-o co pip:
+    * Caso não possua o pipenv, instale-o com pip:
         * ```pip install pipenv```
 * Com o terminal aberto na raiz do projeto, instale as depências num ambiente virtual:
     * ```pipenv install```
