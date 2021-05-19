@@ -1,4 +1,4 @@
-# Testes automatizandos para verificação de endpoint conversores de Inteiro para nome extenso
+# Testes automatizados para verificação de endpoints conversores de inteiro para nome extenso
 
 ## Passo a passo para execução dos testes:
 
